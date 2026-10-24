@@ -288,6 +288,21 @@ impl App {
         self.screen = Screen::Settings;
     }
 
+    pub fn open_monitor(&mut self) {
+        self.editing = None;
+        self.show_command = false;
+        self.log_scroll = 0;
+        self.screen = Screen::Running;
+    }
+
+    pub fn selected_is_running(&self) -> bool {
+        opens_monitor(
+            self.server.running(),
+            self.server.info().map(|info| info.model_path.as_path()),
+            self.selected_model().map(|model| model.path.as_path()),
+        )
+    }
+
     pub fn leave_configure(&mut self) {
         if let Some(model) = self.selected_model() {
             let path = model.path.clone();
@@ -366,6 +381,7 @@ impl App {
 
         let info = RunInfo {
             model_name: model.name.clone(),
+            model_path: model.path.clone(),
             backend,
             host: settings.host.clone(),
             port: chosen_port,
@@ -1147,7 +1163,13 @@ impl App {
             KeyCode::PageDown => self.move_models(10),
             KeyCode::Home | KeyCode::Char('g') => self.move_models(-(i64::MAX / 2)),
             KeyCode::End | KeyCode::Char('G') => self.move_models(i64::MAX / 2),
-            KeyCode::Enter => self.open_configure(),
+            KeyCode::Enter => {
+                if self.selected_is_running() {
+                    self.open_monitor();
+                } else {
+                    self.open_configure();
+                }
+            }
             KeyCode::Char('l') | KeyCode::Char('L') => self.request_launch(),
             KeyCode::Char('s') => self.open_settings(),
             KeyCode::Char('r') => self.rescan(true),
@@ -1413,6 +1435,7 @@ impl App {
             "Keys".to_string(),
             "  ↑/↓ move · ←/→ change · Enter edit · Tab section".to_string(),
             "  L launch · c command · r rescan · s settings · ? help · q quit".to_string(),
+            "  Enter on the running model shows its log · b comes back".to_string(),
             "How it works".to_string(),
             "  llm starts llama.cpp or vLLM locally and opens a chat page.".to_string(),
             "  Nothing is uploaded; models and prompts stay on this computer.".to_string(),
@@ -1440,6 +1463,15 @@ fn move_list_state(state: &mut ListState, len: usize, delta: i64) {
     let current = state.selected().unwrap_or(0) as i64;
     let next = (current + delta).clamp(0, len as i64 - 1) as usize;
     state.select(Some(next));
+}
+
+/// True when the highlighted model is the one the live server was launched from,
+/// which is what makes Enter show its log instead of the settings form.
+fn opens_monitor(running: bool, running_path: Option<&Path>, selected: Option<&Path>) -> bool {
+    matches!(
+        (running, running_path, selected),
+        (true, Some(running), Some(selected)) if running == selected
+    )
 }
 
 fn on_off(value: bool) -> String {
@@ -1544,6 +1576,18 @@ fn wrap_lines(text: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn enter_shows_log_only_for_the_running_model() {
+        let running = Path::new("/models/a.gguf");
+        let other = Path::new("/models/b.gguf");
+
+        assert!(opens_monitor(true, Some(running), Some(running)));
+        assert!(!opens_monitor(true, Some(running), Some(other)));
+        assert!(!opens_monitor(false, Some(running), Some(running)));
+        assert!(!opens_monitor(true, Some(running), None));
+        assert!(!opens_monitor(true, None, Some(running)));
+    }
 
     #[test]
     fn gpu_layer_cycle_is_predictable() {

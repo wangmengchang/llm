@@ -18,6 +18,7 @@ pub enum ServerStatus {
 #[derive(Clone, Debug)]
 pub struct RunInfo {
     pub model_name: String,
+    pub model_path: PathBuf,
     pub backend: Backend,
     pub host: String,
     pub port: u16,

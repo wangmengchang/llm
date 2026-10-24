@@ -326,7 +326,14 @@ fn draw_model_details(frame: &mut Frame, app: &App, area: Rect) {
             "Enter",
             Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(" tune settings", Style::default().fg(TEXT)),
+        Span::styled(
+            if app.selected_is_running() {
+                " view log"
+            } else {
+                " tune settings"
+            },
+            Style::default().fg(TEXT),
+        ),
         Span::styled("    ", Style::default()),
         Span::styled(
             "L",
@@ -1073,10 +1080,15 @@ fn draw_logs(frame: &mut Frame, app: &mut App, area: Rect) {
 
 fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
     let lines = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).split(area);
+    let enter_hint = if app.selected_is_running() {
+        "view log"
+    } else {
+        "configure"
+    };
     let hints: Vec<(&str, &str)> = match app.screen {
         Screen::Models if area.width < 88 => vec![
             ("↑/↓", "move"),
-            ("Enter", "configure"),
+            ("Enter", enter_hint),
             ("L", "launch"),
             ("s", "settings"),
             ("?", "help"),
@@ -1084,7 +1096,7 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
         ],
         Screen::Models => vec![
             ("↑/↓", "move"),
-            ("Enter", "configure"),
+            ("Enter", enter_hint),
             ("L", "launch"),
             ("s", "settings"),
             ("r", "rescan"),
@@ -1152,6 +1164,9 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
         );
     } else {
         let tip = match app.screen {
+            Screen::Models if app.selected_is_running() => {
+                "Tip: this model is serving requests. Press Enter to read its log."
+            }
             Screen::Models => {
                 "Tip: press Enter to tune settings, or L to run with the saved settings."
             }
